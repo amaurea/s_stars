@@ -1,0 +1,51 @@
+# Periastron distance error from Stefan Gillessen, in arcsec.
+# Periastron distance is a(1-e)
+# Speed given by Kepler's second law - mean area sweep = current area sweep
+# Mean swep = pi*a*b/P = pi*a**2/P*sqrt(1-e**2)
+# Current sweep = 0.5*r*v = 0.5*v*a*(1-e)
+# => v = 2*pi*a/P*sqrt(1-e**2)/(1-e)
+#
+# How does knowing the periastron error explicitly help us? We have 3 data points
+# with unknown covariance: a, P and e. Knowing the error on a*(1-e) lets us fill in
+# the [a,e] covariance, but it's not obvious that that's very helpful. The updated
+# errors are quite small anyway, so will just go with the parameters.
+S1    0.000708205
+S2    0.0000125581
+S4    0.00304711
+S6    0.000516646
+S8    0.00274619
+S9    0.00450543
+S12   0.000235037
+S13   0.000162355
+S14   0.000466953
+S17   0.00197192
+S18   0.000426962
+S19   0.000510883
+S21   0.000437886
+S22   0.000291503
+S23   0.0000852115
+S24   0.00376394
+S29   0.00824028
+S31   0.00175875
+S33   0.0219622
+S38   0.000175384
+S39   0.000397134
+S42   0.002959
+S54   0.00011288
+S55   0.000495866
+S60   0.000106522
+S66   0.0758336
+S67   0.0440766
+S71   0.0000678494
+S83   0.00230491
+S85   0.00324803
+S87   0.314551
+S89   0.0497875
+S91   0.00885845
+S96   0.0647717
+S97   0.0373229
+S111  0.0606789
+S145  0.179879
+S175  0.000101886
+R34   0.104692
+R44   0.110123
