@@ -50,13 +50,13 @@ int main(int argc, char ** argv) {
 	int nsamp = 10000, si;
 
 	double R = 8179, dR = 13;
-	double a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag, R_, dR_, dr_ang;
+	double a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag, R_, dR_, q_ang, dq_ang;
 	int ref;
 
 	// First output the format-dependent header
 	switch(format) {
 		case(ascii):
-			fprintf(ofile, "%-4s  %6s %6s  %6s %6s  %6s %4s  %6s %5s  %6s %5s  %8s %7s  %7s %6s  %5s   %8s %8s %6s %6s\n", "id", "a", "da", "e", "de", "i", "di", "Om", "dOm", "w", "dw", "Tp", "dTp", "P", "dP", "Kmag", "q", "dq", "v", "dv");
+			fprintf(ofile, "%-4s  %6s %6s  %6s %6s  %6s %4s  %6s %5s  %6s %5s  %8s %7s  %7s %6s  %5s   %8s %8s %6s %6s  %6s\n", "id", "a", "da", "e", "de", "i", "di", "Om", "dOm", "w", "dw", "Tp", "dTp", "P", "dP", "Kmag", "q", "dq", "v", "dv", "vavg");
 			break;
 		case(html):
 			fprintf(ofile, "<table>\n\t<tr>\n"
@@ -79,6 +79,7 @@ int main(int argc, char ** argv) {
 				"\t\t<th>&Delta;q</th>\n"
 				"\t\t<th>v (%%c)</th>\n"
 				"\t\t<th>&Delta;v</th>\n"
+				"\t\t<th>v&#773;</th>\n"
 				"\t</tr>\n");
 			break;
 		case(wiki):
@@ -102,34 +103,42 @@ int main(int argc, char ** argv) {
 				"! q (AU)\n"
 				"! &Delta;q\n"
 				"! v (%%c)\n"
-				"! &Delta;v\n");
+				"! &Delta;v\n"
+				"! v&#773;\n");
 			break;
 	}
 
 	for(int iline = 0; (nread=getline(&line, &bufsize, ifile)) != -1; iline++) {
 		if(nread > 0 && line[0] == '#') continue;
-		nscan = sscanf(line, "%ms %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %lf",
-				&name, &a, &da, &e, &de, &i, &di, &Om, &dOm, &w, &dw, &Tp, &dTp, &P, &dP, &Kmag, &R_, &dR_, &ref, &dr_ang);
-		if(nscan != 20) {
+		nscan = sscanf(line, "%ms %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %lf %lf",
+				&name, &a, &da, &e, &de, &i, &di, &Om, &dOm, &w, &dw, &Tp, &dTp, &P, &dP, &Kmag, &R_, &dR_, &ref, &q_ang, &dq_ang);
+		if(nscan != 21) {
 			fprintf(stderr, "Error parsing line %d starting with: %.15s\n", iline+1, line);
 			continue;
 		}
 
 		// 1st order analytical error bars, ignoring correlations, but using r_ang
-		double r_ang   = a*(1-e);
-		double r       = R*r_ang;
-		double dr      = r*sqrt(dR*dR/(R*R)+dr_ang*dr_ang/(r_ang*r_ang));
-		double v       = 2*pi*a*R/P*sqrt(2*a/r_ang-1);
-		double dv      = 2*pi*a*R/P*sqrt( (2*a/r_ang-1)*(da*da/(a*a)+dR*dR/(R*R)+dP*dP/(P*P)) + dr_ang*dr_ang/(4*r_ang*r_ang) + da*da/(a*a)*(sqrt(2*a/r_ang-1)+0.25) );
+		if(q_ang < 0) q_ang = a*(1-e);
+		double q       = R*q_ang;
+		double dq      = q*sqrt(dR*dR/(R*R)+dq_ang*dq_ang/(q_ang*q_ang));
+		double v       = 2*pi*a*R/P*sqrt(2*a/q_ang-1);
+		double dv      = 2*pi*a*R/P*sqrt( (2*a/q_ang-1)*(da*da/(a*a)+dR*dR/(R*R)+dP*dP/(P*P)) + dq_ang*dq_ang/(4*q_ang*q_ang) + da*da/(a*a)*(sqrt(2*a/q_ang-1)+0.25) );
+
+		// Get mean velocity too. This is based on
+		// https://www.mathsisfun.com/geometry/ellipse-perimeter.html approx #3 by Ramanujan
+		// It's hard to ge an accurate uncertainty on this. It should be smaller than dv, though.
+		double b = a*sqrt(1-e*e), h = (a-b)*(a-b)/((a+b)*(a+b));
+		double circum  = pi*(a+b)*(1+3*h/(10+sqrt(4-3*h))) * R;
+		double v_avg   = circum/P * pc*arcsec/yr/c;
 
 		// Convert to distance in AU and speed in beta
-		r *= pc*arcsec/AU;   dr *= pc*arcsec/AU;
+		q *= pc*arcsec/AU;   dq *= pc*arcsec/AU;
 		v *= pc*arcsec/yr/c; dv *= pc*arcsec/yr/c;
 
 		// Output table row
 		switch(format) {
 			case(ascii):
-				fprintf(ofile, "%-4s  %6.4f %6.4f  %6.4f %6.4f  %6.2f %4.2f  %6.2f %5.2f  %6.2f %5.2f  %8.3f %7.3f  %7.1f %6.1f  %5.2f   %8.1f %8.1f %6.2f %6.2f\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  r, dr, v*100, dv*100);
+				fprintf(ofile, "%-4s  %6.4f %6.4f  %6.4f %6.4f  %6.2f %4.2f  %6.2f %5.2f  %6.2f %5.2f  %8.3f %7.3f  %7.1f %6.1f  %5.2f   %8.1f %8.1f %6.2f %6.2f  %6.2f\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  q, dq, v*100, dv*100, v_avg*100);
 				break;
 			case(html):
 				fprintf(ofile, "\t<tr>\n"
@@ -153,7 +162,8 @@ int main(int argc, char ** argv) {
 					"\t\t<td>%8.1f</td>\n"
 					"\t\t<td>%6.2f</td>\n"
 					"\t\t<td>%6.2f</td>\n"
-					"\t</tr>\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  r, dr, v*100, dv*100);
+					"\t\t<td>%6.2f</td>\n"
+					"\t</tr>\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  q, dq, v*100, dv*100, v_avg*100);
 				break;
 			case(wiki):
 				fprintf(ofile, "|-\n"
@@ -176,7 +186,8 @@ int main(int argc, char ** argv) {
 					"| %8.1f\n"
 					"| %8.1f\n"
 					"| %6.2f\n"
-					"| %6.2f\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  r, dr, v*100, dv*100);
+					"| %6.2f\n"
+					"| %6.2f\n", name, a, da, e, de, i, di, Om, dOm, w, dw, Tp, dTp, P, dP, Kmag,  q, dq, v*100, dv*100, v_avg*100);
 				break;
 		}
 		free(name);
@@ -193,60 +204,3 @@ int main(int argc, char ** argv) {
 	fclose(ofile);
 	return 0;
 }
-
-#if 0
-// Old stuff
-//
-		// Compute mean and error bars, assuming independent errors, via random sampling
-		double r = 0, dr = 0, v = 0, dv = 0;
-		for(si = 0; si < nsamp; si++) {
-			double R_ = R + 0*rand_gauss()*dR;
-			double a_ = a + rand_gauss()*da;
-			double e_ = fmin(e + rand_gauss()*de, 1-1e-3);
-			double P_ = P + rand_gauss()*dP;
-			double r_ = R_*a_*(1-e_);
-			double v_ = 2*pi*R_*a_/P_*sqrt(1-e_*e_)/(1-e_);
-			r += r_; dr += r_*r_;
-			v += v_; dv += v_*v_;
-		}
-		r /= nsamp; dr = sqrt(dr/nsamp-r*r); // pc*arcsec
-		v /= nsamp; dv = sqrt(dv/nsamp-v*v); // pc*arcsec/yr
-
-// Random number stuff
-static uint64_t       state      = 0x4d595df4d0f33173;   // Or something seed-dependent
-static uint64_t const multiplier = 6364136223846793005u;
-static uint64_t const increment  = 1442695040888963407u; // Or an arbitrary odd constant
-static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
-uint32_t pcg32(void)
-{
-	uint64_t x = state;
-	unsigned count = (unsigned)(x >> 59);      // 59 = 64 - 5
-	state = x * multiplier + increment;
-	x ^= x >> 18;                              // 18 = (64 - 27)/2
-	return rotr32((uint32_t)(x >> 27), count); // 27 = 32 - 5
-}
-void pcg32_init(uint64_t seed)
-{
-	state = seed + increment;
-	(void)pcg32();
-}
-
-double rand_uniform() {
-	// map directly onto float in range [1,2), then subtract 1
-	uint64_t rint = pcg32();
-	uint64_t work = (0x3fflu<<52)|(rint<<20);
-	return (*(double*)&work)-1;
-}
-
-double rand_gauss() {
-	double epsilon = 2e-314;
-	double u1, u2;
-	do {
-		u1 = rand_uniform();
-		u2 = rand_uniform();
-	}
-	while (u1 <= epsilon);
-	return sqrt(-2.0*log(u1))*cos(2*pi*u2);
-}
-
-#endif
